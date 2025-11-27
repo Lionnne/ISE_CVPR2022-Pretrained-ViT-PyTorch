@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""PyTorch Inference Script
-
-An example inference script that outputs top-k class ids for images in a folder into a csv.
-
-Hacked together by / Copyright 2020 Ross Wightman (https://github.com/rwightman)
+"""
+Inference from (https://github.com/huggingface/pytorch-image-models.git)
+GradCam from (https://github.com/Mikael17125/ViT-GradCAM.git)
 """
 import argparse
 import json
@@ -17,6 +15,8 @@ from sys import maxsize
 import numpy as np
 import pandas as pd
 import torch
+import cv2
+from skimage import io
 
 from timm.data import create_dataset, create_loader, resolve_data_config, ImageNetInfo, infer_imagenet_subset
 from timm.layers import apply_test_time_pool
@@ -37,6 +37,9 @@ except ImportError as e:
 
 has_compile = hasattr(torch, 'compile')
 
+# Add the path to ViT-GradCAM repo if not installed (adjust as needed)
+# sys.path.append('/path/to/ViT-GradCAM')
+from gradcam import GradCam  # Assumes gradcam.py is in Python path
 
 _FMT_EXT = {
     'json': '.json',
@@ -98,7 +101,7 @@ parser.add_argument('--num-gpu', type=int, default=1,
 parser.add_argument('--test-pool', dest='test_pool', action='store_true',
                     help='enable test time pool')
 parser.add_argument('--channels-last', action='store_true', default=False,
-                    help='Use channels_last memory layout')
+                    help='Use channels_last memory format')
 parser.add_argument('--device', default='cuda', type=str,
                     help="Device (accelerator) to use.")
 parser.add_argument('--amp', action='store_true', default=False,
@@ -152,12 +155,47 @@ parser.add_argument('--exclude-output', action='store_true', default=False,
 parser.add_argument('--no-console-results', action='store_true', default=False,
                     help='disable printing the inference results to the console')
 
+# New arguments for GradCAM
+parser.add_argument('--enable-gradcam', action='store_true', default=False,
+                    help='Enable GradCAM visualization using ground truth labels as targets')
+parser.add_argument('--viz-dir', type=str, default=None,
+                    help='Directory to save GradCAM overlay images (required if --enable-gradcam)')
+
+
+def gen_cam(image, mask, alpha=0.5):
+    # Create a heatmap from the Grad-CAM mask
+    heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
+    heatmap = np.float32(heatmap) / 255
+    # Superimpose the heatmap on the original image
+    cam = alpha * heatmap + (1-alpha) * image
+    cam = cam / np.max(cam)  # Normalize the result
+    return np.uint8(255 * cam)  # Convert to 8-bit image
+
+# Function to prepare input image for the model
+def prepare_input(image):
+    image = image.copy()  # Copy the image to avoid modifying the original
+
+    # Normalize the image using the mean and standard deviation
+    means = np.array([0.5, 0.5, 0.5])
+    stds = np.array([0.5, 0.5, 0.5])
+    image -= means
+    image /= stds
+
+    # Transpose the image to match the model's expected input format (C, H, W)
+    image = np.ascontiguousarray(np.transpose(image, (2, 0, 1)))
+    image = image[np.newaxis, ...]  # Add batch dimension
+
+    return torch.tensor(image, requires_grad=True)  # Convert to PyTorch tensor
+
 
 def main():
     setup_default_logging()
     args = parser.parse_args()
     # might as well try to do something useful...
     args.pretrained = args.pretrained or not args.checkpoint
+
+    if args.enable_gradcam and not args.viz_dir:
+        raise ValueError("--viz-dir is required when --enable-gradcam is set")
 
     if torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
@@ -272,9 +310,10 @@ def main():
     all_indices = []
     all_labels = []
     all_outputs = []
+    all_targets = []  # For GradCAM
     use_probs = args.output_type == 'prob'
     with torch.inference_mode():
-        for batch_idx, (input, _) in enumerate(loader):
+        for batch_idx, (input, target) in enumerate(loader):
 
             with amp_autocast():
                 output = model(input)
@@ -292,6 +331,7 @@ def main():
                     all_labels.append(np_labels)
 
             all_outputs.append(output.float().cpu().numpy())
+            all_targets.append(target.cpu().numpy())
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -304,7 +344,9 @@ def main():
     all_indices = np.concatenate(all_indices, axis=0) if all_indices else None
     all_labels = np.concatenate(all_labels, axis=0) if all_labels else None
     all_outputs = np.concatenate(all_outputs, axis=0).astype(np.float32)
+    all_gt_labels = np.concatenate(all_targets, axis=0)
     filenames = loader.dataset.filenames(basename=not args.fullname)
+    all_paths = loader.dataset.filenames(basename=False)  # Full paths for GradCAM
 
     output_col = args.output_col or ('prob' if use_probs else 'logit')
     data_dict = {args.filename_col: filenames}
@@ -354,6 +396,35 @@ def main():
     if not args.no_console_results:
         print(f'--result')
         print(df.set_index(args.filename_col).to_json(orient='index', indent=4))
+
+    # GradCAM visualization if enabled
+    if args.enable_gradcam:
+        _logger.info('Starting GradCAM visualization...')
+        target_layer = model.blocks[-1].norm1  # Adjust if needed for your model (e.g., model.norm)
+        grad_cam = GradCam(model, target_layer)
+        os.makedirs(args.viz_dir, exist_ok=True)
+        dtype = model_dtype if model_dtype is not None else torch.float32
+        _logger.info(f'Generating GradCAM for {len(all_paths)} images using GT labels...')
+        for idx, (path,gt_label,pred_label) in enumerate(zip(all_paths,all_gt_labels,all_indices)):
+            try:
+                img = io.imread(os.path.join(args.data_dir,path))
+                img = np.float32(cv2.resize(img, (224, 224))) / 255  # Resize and normalize
+                input_tensor = prepare_input(img).to(device=device,dtype=dtype)  # Prepare the image for the model
+                with torch.enable_grad():
+                    mask = grad_cam(input_tensor)
+                # Generate overlay
+                result = gen_cam(img, mask, alpha=0.4)
+                # Save
+                save_path_dir=os.path.join(args.viz_dir,path.split('/')[0])
+                os.makedirs(save_path_dir, exist_ok=True)
+                basename=os.path.basename(path).split('.')[0]
+                correctness = str(gt_label == pred_label)
+                save_path = os.path.join(save_path_dir, f'{basename}_{correctness}.jpg')
+                cv2.imwrite(save_path, result)
+            except Exception as e:
+                _logger.warning(f"Failed to process {path}: {e}")
+            if (idx + 1) % 100 == 0 or idx + 1 == len(all_paths):
+                _logger.info(f'GradCAM: Processed {idx + 1}/{len(all_paths)} images')
 
 
 def save_results(df, results_filename, results_format='csv', filename_col='filename'):

@@ -6,8 +6,26 @@ from sklearn.metrics import classification_report, confusion_matrix
 import os
 import matplotlib.pyplot as plt
 import argparse  # For command-line argument parsing
+from typing import Dict, List
 
-def main(base_path, csv_file, class_map_file):
+def load_abbrev_map(abbrev_file: str) -> Dict[str, str]:
+    """
+    Load class name to abbreviation mapping from CSV.
+    """
+    if not os.path.exists(abbrev_file):
+        raise FileNotFoundError(f"Abbrev file not found: {abbrev_file}")
+    
+    df = pd.read_csv(abbrev_file)
+    abbrev_map = dict(zip(df['class_name'], df['class_abbrev']))
+    if len(abbrev_map) != 32:
+        print(f"Warning: Expected 32 classes in abbrev file, found {len(abbrev_map)}")
+    return abbrev_map
+
+def create_abbrev(unique_classes: List[str], abbrev_map: Dict[str, str]) -> List[str]:
+    """Create abbreviations using the provided mapping."""
+    return [abbrev_map.get(name, name[:3]) for name in unique_classes]
+
+def main(base_path, csv_file, class_map_file, abbrev_file=None):
     # Validate inputs
     if not os.path.exists(csv_file):
         raise FileNotFoundError(f"CSV file not found: {csv_file}")
@@ -24,8 +42,7 @@ def main(base_path, csv_file, class_map_file):
     # Create mapping from class name to index (index starts from 0 based on file order)
     class_to_id = {cls: idx for idx, cls in enumerate(unique_classes)}
     num_classes = len(unique_classes)  # Determined from file, should be 32
-
-    print(f"Loaded {num_classes} classes from class_map: {unique_classes[:5]}...")  # Preview first 5 for verification
+    assert num_classes == 32, f"Expected 31 classes, found {num_classes}"
 
     # Extract true labels: from the first part of filename (class name)
     df['true_class'] = df['filename'].apply(lambda x: x.split('/')[0])
@@ -101,24 +118,18 @@ def main(base_path, csv_file, class_map_file):
     output_csv = os.path.join(base_path, 'evaluation_results.csv')
     per_class_df.to_csv(output_csv, index=False)
 
-    # # print detailed classification report
-    # print("\n=== Detailed Classification Report ===")
-    # print(classification_report(df['true_label'], df['pred_label'], target_names=unique_classes))
-
     # save confusion matrix to CSV
     cm_df = pd.DataFrame(cm, index=unique_classes, columns=unique_classes)
     cm_df.to_csv(os.path.join(base_path, 'confusion_matrix.csv'))
 
     # Plot and save confusion matrix as image
-    # Create abbreviations: first 3 letters for most classes, 4 for Other_Nassellaria (OthN) and Other_Spumellaria (OthS)
-    abbrev = []
-    for name in unique_classes:
-        if name == 'Other_Nassellaria':
-            abbrev.append('OthN')
-        elif name == 'Other_Spumellaria':
-            abbrev.append('OthS')
-        else:
-            abbrev.append(name[:3])
+    # Load abbreviations from CSV if provided, else fallback to hardcoded
+    if abbrev_file:
+        abbrev_map = load_abbrev_map(abbrev_file)
+        abbrev = create_abbrev(unique_classes, abbrev_map)
+    else:
+        abbrev = [name for name in unique_classes]
+
     # Normalize confusion matrix by row (each row sums to 1)
     row_sums = cm.sum(axis=1, keepdims=True)
     normalize_cm = np.divide(cm, row_sums, out=np.zeros_like(cm, dtype=np.float64), where=row_sums != 0)
@@ -151,5 +162,7 @@ if __name__ == "__main__":
     parser.add_argument("--base_path", type=str, required=True, help="Base path for outputs")
     parser.add_argument("--csv_file", type=str, required=True, help="Path to predictions CSV")
     parser.add_argument("--class_map_file", type=str, required=True, help="Path to class map TXT")
+    parser.add_argument("--abbrev_file", type=str, default="SO32_class_abbrev.csv", 
+                        help="Path to class abbreviation CSV file (class_name,class_abbrev); if not provided, uses fallback abbreviations")
     args = parser.parse_args()
-    main(args.base_path, args.csv_file, args.class_map_file)
+    main(args.base_path, args.csv_file, args.class_map_file, args.abbrev_file)
