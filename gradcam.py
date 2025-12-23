@@ -36,7 +36,8 @@ class GradCam:
     def reshape_transform(self, tensor):
         # if (B, C, H, W) —— ConvNeXt / ResNet 
         if tensor.ndim == 4:
-            return tensor
+            # return tensor
+            return tensor.permute(0, 3, 1, 2)
 
         # if (B, N, C) —— ViT / DeiT / Swin 等
         if tensor.ndim == 3:

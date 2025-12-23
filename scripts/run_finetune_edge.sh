@@ -6,8 +6,9 @@
 # swin_aux_{base/small/tiny}_patch4_window7_224
 # deit_aux_{base/small/tiny}_patch16_224
 
-# REMENBER: move swin_transformer_aux.py and deit_aux.py to timm/models/ first
-# and add the following lines in __init__.py of timm/models/
+# NOTE: move edge_aux_add_to_timm_models/swin_transformer_aux.py 
+# and edge_aux_add_to_timm_models/deit_aux.py to timm/models/ first
+# add the following lines in __init__.py of timm/models/
 # from .deit_aux import *
 # from .swin_transformer_aux import *
 

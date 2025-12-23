@@ -1,64 +1,42 @@
-# ExFractalDB and RCDB
+# Microfossil Classification (ISE Group Work)
 
-## TOC
-- [Summary](#summary)
-- [Updates](#updates)
-- [Citation](#citation)
-- [Requirements](#requirements)
-- [Execution Files](#execution-files)
-- [ExFractalDB Construction](#exfractaldb-construction-readme)
-- [RCDB Construction](#rcdb-construction-readme)
-- [Pre-training](#pre-training)
-  - [Pre-training with shard dataset](#pre-training-with-shard-dataset)
-  - [Pre-trained models](#pre-trained-models)
-- [Fine-Tuning](#fine-tuning)
-- [Inference](#inference)
-- [Evaluation](#evaluation)
-- [Acknowledgements](#acknowledgements)
-- [Terms of use](#terms-of-use)
+## Reproduction Results
 
+We successfully reproduced the key results from the CVPR 2022 paper on the **SO32 dataset**
 
-## Summary
+## Reproduction Results on SO32 (ViT-Base, 40 epochs)
 
-The repository contains ExFractalDB (Extended Fractal DataBase) and RCDB (Radial Contour DataBase) Construction, Pre-training, and Fine-tuning in Python/PyTorch.
+| Pre-training Dataset              | Top-1 Accuracy | Class-Average Accuracy | Notes                          |
+|-----------------------------------|----------------|-------------------------|--------------------------------|
+| ExFractalDB-21k                   | 94.31%         | 84.99%                  | close to paper's 85.29%        |
+| RCDB-21k                          | 93.16%         | **84.34%**              | different with paper's 86.30%  |
+| ImageNet-21k                      | 94.87%         | **86.23%**              | different with paper's 85.61%  |
 
-The repository is based on the paper:
-Hirokatsu Kataoka, Ryo Hayamizu, Ryosuke Yamada, Kodai Nakashima, Sora Takashima, Xinyu Zhang, Edgar Josafat Martinez-Noriega, Nakamasa Inoue and Rio Yokota, "Replacing Labeled Real-Image Datasets With Auto-Generated Contours", IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) 2022
-[[Project](https://hirokatsukataoka16.github.io/Replacing-Labeled-Real-Image-Datasets/)] [[PDF (CVPR)](https://openaccess.thecvf.com/content/CVPR2022/papers/Kataoka_Replacing_Labeled_Real-Image_Datasets_With_Auto-Generated_Contours_CVPR_2022_paper.pdf)] [[Dataset](https://hirokatsukataoka16.github.io/Replacing-Labeled-Real-Image-Datasets/#dataset)] [[Oral](http://hirokatsukataoka.net/pdf/cvpr22_kataoka_oral.pdf)] [[Poster](http://hirokatsukataoka.net/pdf/cvpr22_kataoka_poster.pdf)] [[Supp](http://hirokatsukataoka.net/pdf/cvpr22_kataoka_fdsl_supplementary.pdf)]
+## Improvment Results on SO32 (Official pre-training weights from ImageNet-22K, 40 epochs)
+
+| Model                             | Top-1 Accuracy | Class-Average Accuracy | Notes                          |
+|-----------------------------------|----------------|-------------------------|--------------------------------|
+| ConvNeXT                          | 93.48%         | 87.34%                  | increased ~1%                  |
+| Swin Transformer                  | 95.18%         | **88.15%**              | increased ~2%                  |
+
+![Overall Top-1 Accuracy Results on SO32 Dataset](inference_results/bar_overall.png) 
+![Class Average Accuracy Results on SO32 Dataset](inference_results/bar_class_avg.png)
+
+Additional visualizations (Grad-CAM, confusion matrices, seed comparisons) are available in the repository.
 
 ## Updates
-<!-- TODO update -->
-<!-- **Update (Mar 23, 2022)**
-
-* The paper was accepted to International Journal of Computer Vision (IJCV). We updated the scripts and pre-trained models in the extended experiments. [[PDF](https://link.springer.com/content/pdf/10.1007/s11263-021-01555-8.pdf)] [[Pre-trained Models](https://drive.google.com/drive/folders/1tTD-cKKEgBjacCi4ZJ6bRYOv6FsjtGt_?usp=sharing)]
-
-
-**Update (May 22, 2021)**
-* Related project "Can Vision Transformers Learn without Natural Images?" was released. We achieved to train vision transformers (ViT) without natural images. [[Project](https://hirokatsukataoka16.github.io/Vision-Transformers-without-Natural-Images/)] [[PDF](https://arxiv.org/abs/2103.13023)] [[Code](https://github.com/nakashima-kodai/FractalDB-Pretrained-ViT-PyTorch)] -->
-
-
-**ISE Group Updates (Dec 3, 2025)**
+**ISE Group Updates (Dec 23, 2025)**
 * Add *inference.py* code for model inference
-* Add *evaluation.py* code for results evaluation, including class avg acc calculation and confusion matrix
-* Add plot codes *draw_gradcam_plot.py*, *draw_plots.py*, and *draw_seed_plots.py*
-* Implement GradCAM in *gradcam.py* for visual explaination and analysis
-* Fix enviroment setting problems in *py310.yaml*
+* Add *evaluation.py* code for results evaluation, including class average accuracy calculation and confusion matrix generation
+* Add plot codes *draw_gradcam_plot.py*, *draw_seed_plot.py*, and *draw_violin_plot.py*
+* Implement GradCAM in *gradcam.py* for visual explanation and analysis
+* Fix environment setting problems in *py310.yaml* / *requirements.txt*
+* Implement Canny Edge auxiliary/fusion model. Details in *scripts/run_finetune_edge.sh*
+* ExFractalDB and RCDB Construction details in *exe_scrips/*
+* Downloadable pre-training models [[Link](https://drive.google.com/drive/folders/1ikNUxJoMCx3Lx2TMrXfLdIwI6wwK5w_W?usp=sharing)]
+* Original repository [[Link](https://github.com/masora1030/CVPR2022-Pretrained-ViT-PyTorch)]
 
-## Citation
-
-If you use this code, please cite the following paper:
-```bibtex
-@InProceedings{Kataoka_2022_CVPR,
-    author    = {Kataoka, Hirokatsu and Hayamizu, Ryo and Yamada, Ryosuke and Nakashima, Kodai and Takashima, Sora and Zhang, Xinyu and Martinez-Noriega, Edgar Josafat and Inoue, Nakamasa and Yokota, Rio},
-    title     = {Replacing Labeled Real-Image Datasets With Auto-Generated Contours},
-    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-    month     = {June},
-    year      = {2022},
-    pages     = {21232-21241}
-}
-``` 
-
-## Requirements (Updated)
+## Requirements
 
 * Python 3.10
 * Pytorch 2.7
@@ -74,204 +52,24 @@ $ conda env create -f py310.yml
 $ conda activate vit_new
 ```
 
-* Fine-tuning datasets
-If you would like to fine-tune on an image dataset, you must prepare conventional or self-defined datasets. To use the following execution file ```scripts/finetune.sh```, you should set the downloaded ImageNet-1k dataset as the following structure.
-
-```misc
-/PATH/TO/IMAGENET/
-  train/
-    class1/
-      img1.jpeg
-      ...
-    class2/
-      img2.jpeg
-      ...
-    ...
-  val/
-    class1/
-      img3.jpeg
-      ...
-    class2/
-      img4.jpeg
-      ...
-    ...
-```
-
-## Execution files
-
-We prepared four execution files in ```exe_scripts``` directory. Please type the following commands on your environment. You can execute ExFractalDB (Extended Fractal DataBase) and RCDB (Radial Contour DataBase) Construction, Pre-training, and Fine-tuning.
-
-- Construct ExFractalDB-1k + Pre-train + Fine-tune
-
-  ```bash
-  $ chmod +x exe_scripts/exe_exfractaldb_1k.sh
-  $ bash exe_scripts/exe_exfractaldb_1k.sh
-  ```
-
-- Construct RCDB-1k + Pre-train + Fine-tune
-
-  ```bash
-  $ chmod +x exe_scripts/exe_rcdb_1k.sh
-  $ bash exe_scripts/exe_rcdb_1k.sh
-  ```
-
-> **Note**
-> 
-> - ```exe_scripts/exe_exfractaldb_1k.sh``` and ```exe_scripts/exe_rcdb_1k.sh``` are execution scripts under a single node and 4 GPUs environment. For example, if you wish to run the script under a single node and a single GPU, try setting the ```NGPUS``` and ```NPERNODE``` environment variables in the script to 1. ```NGPUS``` means overall the number of GPUs (processes) and ```NPERNODE``` means GPUs (processes) per node.
-> 
-> - In ```exe_scripts/exe_exfractaldb_21k.sh``` and ```exe_scripts/exe_rcdb_21k.sh```, we use the same configs reported in our paper. Therefore, the setup is multiple nodes and using a large number of GPUs (32 nodes and 128 GPUs for pre-train). If you wish to conduct single-node experiments, please change the config accordingly. Attention, that the number of GPUs used changes the overall batch size proportionally and the optimal learning rate.
-> 
-> - We use OpenGL to generate ExFractalDB, and because of this, generating ExFractalDB in remote environment is currently not tested. Please try to generate ExFractalDB in your local environment. Generating RCDB and training models have been tested in remote environment.
-
-<!-- TODO update -->
-## ExFractalDB Construction ([README](exfractaldb_render/README.md))
-```
-$ cd exfractaldb_render
-$ bash ExFractalDB_render.sh
-```
-
-<!-- TODO update -->
-## RCDB Construction ([README](rcdb_render/README.md))
-```
-$ cd rcdb_render
-$ bash RCDB_render.sh
-```
-
 ## Pre-training
+ExfractalDB abnd RCDB datasets reconstruction files are in ```exe_scripts``` directory.
 
-Run the python script ```pretrain.py```, you can pre-train with your dataset.
+For pre-training, run job script ```scripts/run_pretrain.sh```.
 
-Basically, you can run the python script ```pretrain.py``` with the following command.
-
-- Example : with deit_base, pre-train ExFractalDB-21k, 4 GPUs (Batch Size = 64×4 = 256)
-
-    ```bash
-    $ mpirun -npernode 4 -np 4 \
-      python pretrain.py /PATH/TO/ExFractalDB21000 \
-        --model deit_base_patch16_224 --experiment pretrain_deit_base_ExFractalDB21000_1.0e-3 \
-        --input-size 3 224 224 \
-        --sched cosine_iter --epochs 90 --lr 1.0e-3 --weight-decay 0.05 \
-        --batch-size 64 --opt adamw --num-classes 21000 \
-        --warmup-epochs 5 --cooldown-epochs 0 \
-        --smoothing 0.1 --drop-path 0.1 --aa rand-m9-mstd0.5-inc1 \
-        --repeated-aug --mixup 0.8 --cutmix 1.0 --reprob 0.25 \
-        --remode pixel --interpolation bicubic --hflip 0.0 \
-        -j 16 --eval-metric loss \
-        --interval_saved_epochs 10 --output ./output/pretrain \
-        --log-wandb
-    ```
-
-    > **Note**
-    > 
-    > - ```--batch-size``` means batch size per process. In the above script, for example, you use 4 GPUs (4 process), so overall batch size is 64×4(=256).
-    > 
-    > - In our paper research, for datasets with more than 10k categories, we basically pre-trained with overall batch size of 8192 (64×128).
-    > 
-    > - If you wish to distribute pre-train across multiple nodes, the following must be done.
-    >   - Set the `MASTER_ADDR` environment variable which is the IP address of the machine in rank 0.
-    >   - Set the ```-npernode``` and ```-np``` arguments of ```mpirun``` command.
-    >     - ```-npernode``` means GPUs (processes) per node and ```-np``` means overall the number of GPUs (processes).
-
-Or you can run the job script ```scripts/pretrain.sh``` (support multiple nodes training with OpenMPI). Note, the setup is multiple nodes and using a large number of GPUs (32 nodes and 128 GPUs for pre-train).
-
-When running with the script above, please make your dataset structure as following.
-
-```misc
-/PATH/TO/ExFractalDB21000/
-  cat000000/
-    img0_000000_000000_000.png
-      ...
-  cat000001/
-    img0_000001_000000_000.png
-      ...
-  ...
-  cat002099/
-    img0_002099_000000_000.png
-      ...
-```
-
-After above pre-training, trained models are created like ```output/pretrain/pretrain_deit_base_ExFractalDB21000_1.0e-3/model_best.pth.tar``` and ```output/pretrain/pretrain_deit_base_ExFractalDB21000_1.0e-3/last.pth.tar```. 
-Moreover, you can resume the training from a checkpoint by setting ```--resume``` parameter.
-
-Please see the script and code files for details on each arguments.
-
-### Pre-training with shard dataset
-
-Shard dataset is also available for accelerating IO processing. 
-To make shard dataset, please refer to this repository: https://github.com/webdataset/webdataset. 
-Here is an Example of training with shard dataset.
-
-- Example : with deit_base, pre-train ExFractalDB-21k(shard), 4 GPUs (Batch Size = 64×4 = 256)
-
-    ```bash
-    $ mpirun -npernode 4 -np 4 \
-      python pretrain.py /NOT/WORKING \
-        -w --trainshards /PATH/TO/ExFractalDB21000/SHARDS-{000000..002099}.tar \
-        --model deit_base_patch16_224 --experiment pretrain_deit_base_ExFractalDB21000_1.0e-3_shards \
-        --input-size 3 224 224 \
-        --sched cosine_iter --epochs 90 --lr 1.0e-3 --weight-decay 0.05 \
-        --batch-size 64 --opt adamw --num-classes 21000 \
-        --warmup-epochs 5 --cooldown-epochs 0 \
-        --smoothing 0.1 --drop-path 0.1 --aa rand-m9-mstd0.5-inc1 \
-        --repeated-aug --mixup 0.8 --cutmix 1.0 --reprob 0.25 \
-        --remode pixel --interpolation bicubic --hflip 0.0 \
-        -j 1 --eval-metric loss --no-prefetcher \
-        --interval_saved_epochs 10 --output ./output/pretrain \
-        --log-wandb
-    ```
-​
-When running with the script above with shard dataset, please make your shard dataset structure as following.
-
-```misc
-/PATH/TO/ExFractalDB21000/
-    SHARDS-000000.tar
-    SHARDS-000001.tar
-    ...
-    SHARDS-002099.tar
-```
+More details see the original repository.
 
 ### Pre-trained models
 
-Our pre-trained models are available in this [[Link](https://drive.google.com/drive/folders/1ikNUxJoMCx3Lx2TMrXfLdIwI6wwK5w_W?usp=sharing)].
+The original pre-trained models are available in this [[Link](https://drive.google.com/drive/folders/1ikNUxJoMCx3Lx2TMrXfLdIwI6wwK5w_W?usp=sharing)].
 
-We have mainly prepared two different pre-trained models. These pre-trained models are trained on {ExFractalDB, RCDB}-21k.
+## Fine-tuning
 
-```misc
-exfractal_21k_base.pth.tar: --model deit_base_patch16_224 --experiment pretrain_deit_base_ExFractalDB21000_1.0e-3_shards
-rcdb_21k_base.pth.tar: --model deit_base_patch16_224 --experiment pretrain_deit_base_RCDB21000_1.0e-3_shards
-```
+For fine-tuning, run job script ```scripts/run_finetune.sh```. 
 
-If you would like to additionally train from the pre-trained model, please command with the next fine-tuning code as follows.
+More details see the original repository.
 
-```bash
-# exfractal_21k_base.pth.tar
-$ mpirun -npernode 4 -np 4 \
-  python finetune.py /PATH/TO/YOUR_FT_DATASET \
-    --model deit_base_patch16_224 --experiment finetune_deit_base_YOUR_FT_DATASET_from_ExFractalDB21000_1.0e-3_shards \
-    --input-size 3 224 224 --num-classes YOUR_FT_DATASET_CATEGORY_SIZE \
-    --output ./output/finetune \
-    --log-wandb \
-    --pretrained-path /PATH/TO/exfractal_21k_base.pth.tar
-
-# rcdb_21k_base.pth.tar
-$ mpirun -npernode 4 -np 4 \
-  python finetune.py /PATH/TO/YOUR_FT_DATASET \
-    --model deit_base_patch16_224 --experiment finetune_deit_base_YOUR_FT_DATASET_from_RCDB21000_1.0e-3_shards \
-    --input-size 3 224 224 --num-classes YOUR_FT_DATASET_CATEGORY_SIZE \
-    --output ./output/finetune \
-    --log-wandb \
-    --pretrained-path /PATH/TO/rcdb_21k_base.pth.tar
-```
-
-## Fine-tuning (Updated)
-
-Run the python script ```finetune.py```, you additionally train other datasets from your pre-trained model.
-
-In order to use the fine-tuning code, you must prepare a fine-tuning dataset (e.g., ImageNet-1k, CIFAR-10/100, Pascal VOC 2012). Please look at [Requirements](#Requirements) for a dataset preparation.
-
-Basically, you can run the python script ```finetune.py``` with the following command.
-
-- Example : with deit_base, fine-tune ImageNet-1k from pre-trained model (with ExFractalDB-21k), 4 GPUs (Batch Size = 64×4 = 256)
+<!-- - Example : with deit_base, fine-tune ImageNet-1k from pre-trained model (with ExFractalDB-21k), 4 GPUs (Batch Size = 64×4 = 256)
 
     ```bash
     $ mpirun -npernode 4 -np 4 \
@@ -287,15 +85,7 @@ Basically, you can run the python script ```finetune.py``` with the following co
         --output ./output/finetune \
         --log-wandb \
         --pretrained-path ./output/pretrain/pretrain_deit_base_ExFractalDB21000_1.0e-3/model_best.pth.tar
-    ```
-
-Or you can run the job script ```scripts/finetune.sh``` (support multiple nodes training with OpenMPI).
-
-Please see the script and code files for details on each arguments.
-
-### ISE Group Updates
-
-For reproduction of the paper, you can run job script ```scripts/run_finetune.sh```.
+    ``` -->
 
 > **Note**
 > - cd to your project folder
@@ -303,10 +93,11 @@ For reproduction of the paper, you can run job script ```scripts/run_finetune.sh
 > - `PRETRAIN`: mark which pretrained model to use, and point the path of the pretrained model
 > - Training parameters are already set as the same as in the original paper
 
-## Inference (New)
-### ISE Group Updates
+If you want to try the Canny Edge auxiliary/fusion mode, run job script ```scripts/run_finetune_edge.sh```.
 
-To inference the reproduction results of the paper, you can run job script ```scripts/run_inference.sh```.
+## Inference
+
+For inference, run job script ```scripts/run_inference.sh```.
 
 It will generate a .csv file to store the classification results for all test samples.
 
@@ -316,10 +107,11 @@ It will generate a .csv file to store the classification results for all test sa
 > - `RESULTS_DIR`: inference results directory
 > - If you want to utilize GradCAM to, uncomment the ```--enable-gradcam``` line and set ```--viz-dir```
 
-## Evaluation (New)
-### ISE Group Updates
+If you want to inference Canny Edge auxiliary/fusion results, run job script ```scripts/run_inference_edge.sh```.
 
-To evaluate the reproduction results of the paper, you can run job script ```scripts/run_inference.sh```.
+## Evaluation
+
+For evaluation, run job script ```scripts/run_evaluation.sh```.
 
 It will calculate the accuracy for each class, the overall top-1 accuracy, and the class average accuracy, and generate a confusion matrix plot.
 
@@ -328,26 +120,24 @@ It will calculate the accuracy for each class, the overall top-1 accuracy, and t
 > - `RESULTS_DIR`: inference result directory
 > - `CSV_FILE`: .csv file path (under the inference result directory)
 
-## Result Analysis - Plots (New)
-### ISE Group Updates
+## Result Analysis - Plots
 
-Draw Violin Plot for single/multiple experiments: run ```scripts/run_plots.sh```
-> - `--csv_files`: add the results CSV files path
-> - `--model_names`: for each result give a name to show in the plot
-
-
-Draw Bar Plot for single/multiple experiments (five seeds test): run ```draw_seed_plots.py```
+Draw Bar Plot for single/multiple experiments (five seeds test): run ```draw_seed_plot.py```
 > - `seed_csv_files` in main(): add the results CSV files path
 > - `dataset_groups` in main(): mark the experiment group (e.g. 'rcdb')
 
+Draw Violin Plot for single/multiple experiments: run ```run_seed_plot.py```
+> - `--csv_files`: add the results CSV files path
+> - `--model_names`: for each result give a name to show in the plot
 
 Draw GradCAM Plot for single experiment: run ```draw_gradcam_plot.py```
 > - `VIS_FOLDER`: in make_gradcam_gallery(): change to gradcam visualization directory
 
+---
 
-## Acknowledgements
-
-Training codes are inspired by [timm](https://github.com/rwightman/pytorch-image-models) and [DeiT](https://github.com/facebookresearch/deit).
-
-## Terms of use
-The authors affiliated in National Institute of Advanced Industrial Science and Technology (AIST) and Tokyo Institute of Technology (TITech) are not responsible for the reproduction, duplication, copy, sale, trade, resell or exploitation for any commercial purposes, of any portion of the images and any portion of derived the data. In no event will we be also liable for any other damages resulting from this data or any derived data.
+**Project Info**  
+This project is completed as a group work for ISE course.
+  
+- **Group Members**: Daniil Sobolev, Daniel Zhang, Junyi Liu
+- **Repository Maintainer**: Junyi Liu [itsjunyiliu@gmail.com](mailto:itsjunyiliu@gmail.com)
+- **Date**: December 23 2025
