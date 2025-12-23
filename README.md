@@ -33,6 +33,8 @@ We successfully reproduced the key results from the CVPR 2022 paper on the **SO3
 
 Additional visualizations (Grad-CAM, confusion matrices, seed comparisons) are available in the repository.
 
+### Download the best model (swin_base_patch4_window7_224) [[Link](https://drive.google.com/file/d/1mKtniwNyszW1ynar3dQbumRE4OPUs5VS/view?usp=drive_link)]
+
 ## Updates
 
 * Add ```inference.py``` code for model inference
