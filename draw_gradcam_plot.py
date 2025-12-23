@@ -7,7 +7,7 @@ from matplotlib.patches import Rectangle
 
 def make_gradcam_gallery():
     # Path to visualization results
-    VIS_FOLDER = r"./inference_results/imagenet_SO32_repro256/vis_results"
+    VIS_FOLDER = r"/ldap_shared/home/s_ljy/Projects/CVPR2022-Pretrained-ViT-PyTorch/inference_results/swin_base_patch4_window7_224.ms_in22k_SO32_1.0e-4_adamw_wd1e-4_aug42/vis_results_2"
 
     # Derive title from parent folder name
     parent_dir = os.path.dirname(VIS_FOLDER.rstrip("/\\"))

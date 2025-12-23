@@ -400,8 +400,9 @@ def main():
     # GradCAM visualization if enabled
     if args.enable_gradcam:
         _logger.info('Starting GradCAM visualization...')
-        target_layer = model.blocks[-1].norm1  # Adjust if needed for your model (e.g., vit, swin)
-        # target_layer = model.stages[-1].blocks[-1].conv_dw   # convnext
+        target_layer = model.layers[-2].blocks[-1].norm1    # for swin transformer
+        # target_layer = model.blocks[-1].norm1             # for deit/vit
+        # target_layer = model.stages[-1].blocks[-1].conv_dw   # for convnext
         grad_cam = GradCam(model, target_layer)
         os.makedirs(args.viz_dir, exist_ok=True)
         dtype = model_dtype if model_dtype is not None else torch.float32
