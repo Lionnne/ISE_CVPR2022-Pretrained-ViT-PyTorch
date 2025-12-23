@@ -6,7 +6,31 @@ import os
 import random
 from torchvision import transforms
 import gdown  # pip install gdown
+import re
 
+GITHUB_USER = "Lionnne"
+GITHUB_REPO = "ISE_CVPR2022-Pretrained-ViT-PyTorch"
+GITHUB_BRANCH = "main"
+
+def fix_readme_images(content):
+    """
+    Replaces relative image paths (e.g., 'figs/plot.png') 
+    with absolute GitHub Raw URLs so they display correctly in Streamlit.
+    """
+    base_url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/"
+    
+    # Regex to find markdown images: ![alt](path)
+    def replacer(match):
+        alt_text = match.group(1)
+        path = match.group(2)
+        # If it's already a web link (starts with http), leave it alone
+        if path.startswith("http"):
+            return match.group(0)
+        # Otherwise, prepend the GitHub Raw URL
+        return f"![{alt_text}]({base_url}{path})"
+
+    return re.sub(r'!\[(.*?)\]\((.*?)\)', replacer, content)
+    
 # ================= CONFIGURATION =================
 
 # 1. Model Architecture
@@ -24,7 +48,13 @@ IMAGE_FOLDER = 'webapp/examples'
 
 # ================= DEVICE CONFIGURATION =================
 # Automatically detect if a GPU is available
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if torch.cuda.is_available():
+    DEVICE = torch.device('cuda')
+    # Get the specific name of the GPU (e.g., "NVIDIA GeForce RTX 4090")
+    DEVICE_NAME = torch.cuda.get_device_name(0)
+else:
+    DEVICE = torch.device('cpu')
+    DEVICE_NAME = "CPU"
 
 # =================================================
 
@@ -85,7 +115,7 @@ def load_class_map(file_path):
 def load_model(num_classes):
     """
     Loads the model architecture and weights.
-    Handles device transfer (CPU <-> GPU).
+    Handles  transfer (CPU <-> GPU).
     """
     # 1. Download if missing
     if not download_model_if_needed():
@@ -98,7 +128,7 @@ def load_model(num_classes):
         # 3. Load Weights
         if os.path.exists(MODEL_PATH):
             # Load to CPU first to avoid CUDA OOM or device mismatch during load
-            checkpoint = torch.load(MODEL_PATH, map_location='cpu')
+            checkpoint = torch.load(MODEL_PATH, map_location='cpu', weights_only=False)
             
             # Handle different saving formats (dict vs model object)
             if 'model' in checkpoint:
@@ -138,9 +168,8 @@ st.sidebar.title("Navigation")
 selection = st.sidebar.radio("Go to", ["Model Demo", "Project README"])
 
 # Display Device Status
-device_name = str(DEVICE).upper()
 status_icon = "🚀" if "cuda" in str(DEVICE) else "💻"
-st.sidebar.markdown(f"**Hardware:** {device_name} {status_icon}")
+st.sidebar.markdown(f"**Hardware:** {DEVICE_NAME} {status_icon}")
 
 # Load Class Names
 if os.path.exists(CLASS_MAP_FILE):
@@ -156,12 +185,15 @@ if selection == "Project README":
     st.title("📄 Project Introduction")
     if os.path.exists("README.md"):
         with open("README.md", "r", encoding="utf-8") as f:
-            st.markdown(f.read())
+            content = f.read()
+            # Apply the fix function before displaying
+            fixed_content = fix_readme_images(content)
+            st.markdown(fixed_content)
     else:
         st.warning("README.md not found in the current directory.")
 
 elif selection == "Model Demo":
-    st.title(f"🦕 Fossil Classification (Top 5)")
+    st.title(f"Microfossil Classification")
     st.caption(f"Model Architecture: `{MODEL_ARCH}` | Running on: `{device_name}`")
 
     # Initialize Session State
