@@ -247,7 +247,7 @@ elif selection == "Model Demo":
                     model = load_model(len(CLASS_NAMES))
                     
                     if model:
-                        with st.spinner(f'Analyzing image on {device_name}...'):
+                        with st.spinner(f'Analyzing image on {DEVICE_NAME}...'):
                             try:
                                 img = Image.open(st.session_state.current_image_path).convert('RGB')
                                 input_tensor = process_image(img)
