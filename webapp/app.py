@@ -44,11 +44,9 @@ def fix_readme_images(content):
 # ================= CONFIGURATION =================
 
 # 1. Model Architecture
-# Must match the architecture used during training
 MODEL_ARCH = 'swin_base_patch4_window7_224.ms_in22k'
 
-# 2. Google Drive File ID (IMPORTANT: Replace with your actual File ID)
-# Link format: https://drive.google.com/file/d/YOUR_ID_HERE/view
+# 2. Google Drive File ID
 GDRIVE_FILE_ID = '1mKtniwNyszW1ynar3dQbumRE4OPUs5VS' 
 
 # 3. Local paths
@@ -60,7 +58,6 @@ IMAGE_FOLDER = 'webapp/examples'
 # Automatically detect if a GPU is available
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda')
-    # Get the specific name of the GPU (e.g., "NVIDIA GeForce RTX 4090")
     DEVICE_NAME = torch.cuda.get_device_name(0)
 else:
     DEVICE = torch.device('cpu')
@@ -71,13 +68,9 @@ else:
 st.set_page_config(page_title="Fossil Classification Demo", layout="wide")
 
 def download_model_if_needed():
-    """
-    Checks if the model exists locally. If not, downloads it from Google Drive.
-    """
+    """Checks if the model exists locally. If not, downloads it from Google Drive."""
     if not os.path.exists(MODEL_PATH):
-        # Ensure the directory exists
         os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-        
         st.info(f"Model weights not found locally. Downloading from Google Drive...")
         try:
             url = f'https://drive.google.com/uc?id={GDRIVE_FILE_ID}'
@@ -90,10 +83,7 @@ def download_model_if_needed():
     return True
 
 def load_class_map(file_path):
-    """
-    Reads the class_map file and returns a list of class names.
-    Supports 'Index Name' format or simple line-by-line list.
-    """
+    """Reads the class_map file and returns a list of class names."""
     classes = {}
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -108,13 +98,11 @@ def load_class_map(file_path):
             if len(parts) == 2 and parts[0].isdigit():
                 classes[int(parts[0])] = parts[1]
             else:
-                # Default to line index
                 classes[idx] = line
 
         if not classes: return []
         
         max_idx = max(classes.keys())
-        # Reconstruct list ensuring correct order
         return [classes.get(i, f"Class_{i}") for i in range(max_idx + 1)]
 
     except Exception as e:
@@ -123,24 +111,16 @@ def load_class_map(file_path):
 
 @st.cache_resource
 def load_model(num_classes):
-    """
-    Loads the model architecture and weights.
-    Handles  transfer (CPU <-> GPU).
-    """
-    # 1. Download if missing
+    """Loads the model architecture and weights."""
     if not download_model_if_needed():
         return None
 
     try:
-        # 2. Create Model Architecture
         model = timm.create_model(MODEL_ARCH, pretrained=False, num_classes=num_classes)
         
-        # 3. Load Weights
         if os.path.exists(MODEL_PATH):
-            # Load to CPU first to avoid CUDA OOM or device mismatch during load
             checkpoint = torch.load(MODEL_PATH, map_location='cpu', weights_only=False)
             
-            # Handle different saving formats (dict vs model object)
             if 'model' in checkpoint:
                 state_dict = checkpoint['model']
             elif 'state_dict' in checkpoint:
@@ -149,8 +129,6 @@ def load_model(num_classes):
                 state_dict = checkpoint
             
             model.load_state_dict(state_dict, strict=False)
-            
-            # 4. Move to the detected device (GPU or CPU)
             model.to(DEVICE)
             model.eval()
             return model
@@ -162,26 +140,21 @@ def load_model(num_classes):
         return None
 
 def process_image(image):
-    """
-    Preprocesses the image: Resize -> Tensor -> Normalize.
-    """
+    """Preprocesses the image: Resize -> Tensor -> Normalize."""
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        # Standard ImageNet normalization
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    return transform(image).unsqueeze(0) # Add batch dimension (1, C, H, W)
+    return transform(image).unsqueeze(0)
 
 # ================= SIDEBAR & SETUP =================
 st.sidebar.title("Navigation")
 selection = st.sidebar.radio("Go to", ["Model Demo", "Project README"])
 
-# Display Device Status
 status_icon = "🚀" if "cuda" in str(DEVICE) else "💻"
 st.sidebar.markdown(f"**Hardware:** {DEVICE_NAME} {status_icon}")
 
-# Load Class Names
 if os.path.exists(CLASS_MAP_FILE):
     CLASS_NAMES = load_class_map(CLASS_MAP_FILE)
     st.sidebar.success(f"Loaded {len(CLASS_NAMES)} classes")
@@ -196,9 +169,7 @@ if selection == "Project README":
     if os.path.exists("README.md"):
         with open("README.md", "r", encoding="utf-8") as f:
             content = f.read()
-            # Apply the fix function
             fixed_content = fix_readme_images(content)
-            # IMPORTANT: Set unsafe_allow_html=True to render <div> and <img> tags
             st.markdown(fixed_content, unsafe_allow_html=True)
     else:
         st.warning("README.md not found in the current directory.")
@@ -208,11 +179,16 @@ elif selection == "Model Demo":
     st.caption(f"Model Architecture: `{MODEL_ARCH}` | Running on: `{DEVICE_NAME}`")
 
     # Initialize Session State
+    if 'selected_mode' not in st.session_state:
+        st.session_state.selected_mode = 'random' # 'random' or 'upload'
     if 'current_image_path' not in st.session_state:
         st.session_state.current_image_path = None
+    if 'uploaded_file' not in st.session_state:
+        st.session_state.uploaded_file = None
+    if 'prediction' not in st.session_state:
         st.session_state.prediction = None
 
-    # Load images
+    # Load images list
     image_files = []
     if os.path.exists(IMAGE_FOLDER):
         image_files = [f for f in os.listdir(IMAGE_FOLDER) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
@@ -220,25 +196,58 @@ elif selection == "Model Demo":
     # Layout: 2 Columns
     col1, col2 = st.columns([1, 1])
 
-    # --- Column 1: Image Selection ---
+    # --- Column 1: Image Selection (Modified to support Tabs) ---
     with col1:
         st.subheader("1. Select Image")
-        if st.button("🎲 Random Selection", use_container_width=True):
-            if image_files:
-                selected = random.choice(image_files)
-                st.session_state.current_image_path = os.path.join(IMAGE_FOLDER, selected)
-                st.session_state.prediction = None # Reset result
-            else:
-                st.warning(f"No images found in '{IMAGE_FOLDER}'")
         
-        if st.session_state.current_image_path:
-            image = Image.open(st.session_state.current_image_path).convert('RGB')
-            st.image(image, caption=os.path.basename(st.session_state.current_image_path), use_container_width=True)
+        # tabs
+        tab1, tab2 = st.tabs(["🎲 Random Sample", "📤 Upload Image"])
+        
+        # === TAB 1: Random Selection ===
+        with tab1:
+            if st.button("Pick Random Image", use_container_width=True):
+                if image_files:
+                    selected = random.choice(image_files)
+                    st.session_state.current_image_path = os.path.join(IMAGE_FOLDER, selected)
+                    st.session_state.selected_mode = 'random'
+                    st.session_state.prediction = None
+                else:
+                    st.warning(f"No images found in '{IMAGE_FOLDER}'")
 
-    # --- Column 2: Inference ---
+            if st.session_state.selected_mode == 'random' and st.session_state.current_image_path:
+                st.info(f"Selected: {os.path.basename(st.session_state.current_image_path)}")
+
+        # === TAB 2: Upload Image ===
+        with tab2:
+            uploaded_file = st.file_uploader("Choose a file...", type=['jpg', 'jpeg', 'png'])
+            if uploaded_file is not None:
+                st.session_state.uploaded_file = uploaded_file
+                st.session_state.selected_mode = 'upload'
+                # st.session_state.prediction = None 
+
+        # --- Display the image based on mode ---
+        display_img = None
+        try:
+            if st.session_state.selected_mode == 'random' and st.session_state.current_image_path:
+                display_img = Image.open(st.session_state.current_image_path).convert('RGB')
+                st.image(display_img, caption="Random Sample", use_container_width=True)
+            
+            elif st.session_state.selected_mode == 'upload' and st.session_state.uploaded_file:
+                display_img = Image.open(st.session_state.uploaded_file).convert('RGB')
+                st.image(display_img, caption="Uploaded Image", use_container_width=True)
+        except Exception as e:
+            st.error(f"Error loading image: {e}")
+
+
+    # --- Column 2: Inference (Updated to handle both sources) ---
     with col2:
         st.subheader("2. Inference")
-        if st.session_state.current_image_path:
+        
+        # Check if we have a valid image to classify
+        has_valid_image = (st.session_state.selected_mode == 'random' and st.session_state.current_image_path) or \
+                          (st.session_state.selected_mode == 'upload' and st.session_state.uploaded_file)
+
+        if has_valid_image:
             if st.button("🚀 Classify", type="primary", use_container_width=True):
                 if not CLASS_NAMES:
                     st.error("Cannot classify: Class map not loaded.")
@@ -249,10 +258,15 @@ elif selection == "Model Demo":
                     if model:
                         with st.spinner(f'Analyzing image on {DEVICE_NAME}...'):
                             try:
-                                img = Image.open(st.session_state.current_image_path).convert('RGB')
+                                # Determine which image to open
+                                if st.session_state.selected_mode == 'random':
+                                    img = Image.open(st.session_state.current_image_path).convert('RGB')
+                                else:
+                                    img = Image.open(st.session_state.uploaded_file).convert('RGB')
+
                                 input_tensor = process_image(img)
                                 
-                                # Move input data to the same device as the model (GPU or CPU)
+                                # Move input data to device
                                 input_tensor = input_tensor.to(DEVICE)
                                 
                                 with torch.no_grad():
@@ -289,8 +303,7 @@ elif selection == "Model Demo":
                     conf = top_probs[i].item()
                     name = CLASS_NAMES[idx] if idx < len(CLASS_NAMES) else f"Class {idx}"
                     
-                    # Display progress bar with label
                     st.progress(conf, text=f"#{i+1} {name} ({conf*100:.2f}%)")
 
         else:
-            st.info("Please select an image on the left first.")
+            st.info("Please select or upload an image on the left first.")
