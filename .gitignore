@@ -13,3 +13,7 @@ build/
 .vscode/
 .idea/
 wandb/
+webapp/*
+!webapp/app.py
+!webapp/examples/
+dataset
