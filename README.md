@@ -1,5 +1,8 @@
 # Microfossil Classification (ISE Group Work)
 
+**Try DEMO on:**
+**https://isecvpr2022-pretrained-vit-pytorch.streamlit.app/**
+
 ## Reproduction Results
 
 We successfully reproduced the key results from the CVPR 2022 paper on the **SO32 dataset**
@@ -57,6 +60,7 @@ Please install packages with the following command. (use conda env)
 $ conda env create -f py310.yml
 $ conda activate vit_new
 ```
+> Note: Please do not use ```requirements.txt```, which is for streamlit webapp.
 
 ## Pre-training
 ExfractalDB abnd RCDB datasets reconstruction files are in ```exe_scripts``` directory.
