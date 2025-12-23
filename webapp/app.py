@@ -14,22 +14,32 @@ GITHUB_BRANCH = "main"
 
 def fix_readme_images(content):
     """
-    Replaces relative image paths (e.g., 'figs/plot.png') 
-    with absolute GitHub Raw URLs so they display correctly in Streamlit.
+    Replaces relative image paths in BOTH Markdown and HTML tags 
+    with absolute GitHub Raw URLs.
     """
     base_url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/"
     
-    # Regex to find markdown images: ![alt](path)
-    def replacer(match):
+    # 1. Fix standard Markdown images: ![alt](path)
+    def replacer_md(match):
         alt_text = match.group(1)
         path = match.group(2)
-        # If it's already a web link (starts with http), leave it alone
-        if path.startswith("http"):
-            return match.group(0)
-        # Otherwise, prepend the GitHub Raw URL
+        if path.startswith("http"): return match.group(0)
         return f"![{alt_text}]({base_url}{path})"
+    
+    content = re.sub(r'!\[(.*?)\]\((.*?)\)', replacer_md, content)
 
-    return re.sub(r'!\[(.*?)\]\((.*?)\)', replacer, content)
+    # 2. Fix HTML images: src="path"
+    # This matches src="path" or src='path'
+    def replacer_html(match):
+        quote = match.group(1) # Capture the opening quote (" or ')
+        path = match.group(2)  # Capture the path inside
+        if path.startswith("http"): return match.group(0)
+        # Reconstruct the string with the new full URL
+        return f'src={quote}{base_url}{path}{quote}'
+
+    content = re.sub(r'src=(["\'])(.*?)\1', replacer_html, content)
+
+    return content
     
 # ================= CONFIGURATION =================
 
@@ -186,15 +196,16 @@ if selection == "Project README":
     if os.path.exists("README.md"):
         with open("README.md", "r", encoding="utf-8") as f:
             content = f.read()
-            # Apply the fix function before displaying
+            # Apply the fix function
             fixed_content = fix_readme_images(content)
-            st.markdown(fixed_content)
+            # IMPORTANT: Set unsafe_allow_html=True to render <div> and <img> tags
+            st.markdown(fixed_content, unsafe_allow_html=True)
     else:
         st.warning("README.md not found in the current directory.")
 
 elif selection == "Model Demo":
     st.title(f"Microfossil Classification")
-    st.caption(f"Model Architecture: `{MODEL_ARCH}` | Running on: `{device_name}`")
+    st.caption(f"Model Architecture: `{MODEL_ARCH}` | Running on: `{DEVICE_NAME}`")
 
     # Initialize Session State
     if 'current_image_path' not in st.session_state:
